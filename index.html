@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="es"><!-- Proyecto 5.0 - Empleados cargados automáticamente desde base de datos Excel -->
+<head>
+  <!-- configuración base del documento -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Formulario de asistencia</title>
+  <!-- librería externa SheetJS para generar archivos .xlsx desde el navegador -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* imagen de fondo para el formulario */
+    body {
+      font-family: Arial, sans-serif;
+      background-image: url("C:/Users/Comercio/Downloads/WhatsApp Image 2026-06-09 at 10.00.03 AM.jpeg");
+      background-position: center center;
+      background-repeat: no-repeat;
+      background-size: cover;
+      background-attachment: fixed;
+      display: flex;
+      justify-content: center;
+      padding: 40px 16px;
+      min-height: 100vh;
+    }
+
+    /* tarjeta blanca que contiene todo el formulario */
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+      padding: 32px;
+      width: 100%;
+      max-width: 660px;
+      height: fit-content;
+    }
+
+    /* título principal del formulario */
+    h1 { font-size: 20px; font-weight: 700; color: #1a1a2e; margin-bottom: 6px; }
+
+    /* subtítulo que muestra empresa y teléfono del empleado seleccionado */
+    .subtitulo { font-size: 13px; color: #888; margin-bottom: 24px; }
+
+    /* estilos generales de etiquetas */
+    label { display: block; font-size: 13px; color: #555; margin-bottom: 5px; }
+
+    /* estilos para todos los campos de entrada y select */
+    input[type="text"],
+    input[type="email"],
+    input[type="number"],
+    input[type="password"],
+    select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #dde1e7;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #1a1a2e;
+      outline: none;
+      transition: border-color 0.2s;
+      background: #fff;
+    }
+    input:focus, select:focus { border-color: #5c6bc0; }
+    input:disabled, select:disabled { background: #f5f5f5; color: #aaa; cursor: not-allowed; }
+
+    /* estructura de dos columnas para los campos del formulario */
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+
+    /* estilos base compartidos por todos los botones */
+    .btn { width: 100%; padding: 11px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+
+    /* botón principal azul - usado para registrarse */
+    .btn-primary { background: #5c6bc0; color: #fff; margin-top: 4px; }
+    .btn-primary:hover:not(:disabled) { background: #3f51b5; }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* botón verde - usado para descargar Excel */
+    .btn-success { background: #fff; color: #2e7d32; border: 1.5px solid #2e7d32; margin-top: 10px; }
+    .btn-success:hover { background: #2e7d32; color: #fff; }
+
+    /* botón rojo - usado para limpiar todos los registros */
+    .btn-danger { background: none; color: #e53935; border: 1px solid #e53935; margin-top: 8px; font-size: 13px; padding: 9px; }
+    .btn-danger:hover { background: #e53935; color: #fff; }
+
+    /* mensaje de confirmación que aparece tras registrarse correctamente */
+    .msg-ok {
+      display: none; background: #e8f5e9; border: 1px solid #a5d6a7;
+      border-radius: 8px; padding: 24px; text-align: center; margin-bottom: 16px;
+    }
+    .msg-ok .ico { font-size: 36px; margin-bottom: 8px; }
+    .msg-ok h2 { font-size: 16px; color: #2e7d32; margin-bottom: 4px; }
+    .msg-ok p  { font-size: 13px; color: #555; }
+
+    /* contenedor de la tabla de registros */
+    .tabla-wrap { border: 1px solid #eee; border-radius: 8px; overflow-x: auto; margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 700px; }
+
+    /* encabezados de la tabla */
+    thead th { background: #f0f2f8; color: #444; padding: 9px 10px; text-align: left; font-weight: 600; white-space: nowrap; }
+    tbody tr { border-top: 1px solid #eee; }
+    tbody tr:hover { background: #fafbff; }
+    tbody td { padding: 8px 10px; color: #333; white-space: nowrap; }
+
+    /* colores para el estado del registro en la tabla */
+    .tag-ok   { color: #2e7d32; font-weight: 600; } /* llegó a tiempo */
+    .tag-desc { color: #e65100; font-weight: 600; } /* tiene descuento */
+
+    /* texto contador de registros sobre la tabla */
+    .empty { text-align: center; color: #aaa; padding: 20px; font-size: 13px; }
+    .contador { font-size: 12px; color: #888; margin-bottom: 10px; }
+
+    /* sección de acceso admin con PIN - visible siempre al fondo */
+    .admin-section { margin-top: 24px; border-top: 1px dashed #ddd; padding-top: 16px; }
+    .admin-label { font-size: 12px; color: #999; margin-bottom: 8px; text-align: center; }
+
+    /* fila con input de PIN y botón de entrada */
+    .admin-row { display: flex; gap: 8px; }
+    .admin-row input { flex: 1; letter-spacing: 4px; text-align: center; font-size: 16px; }
+    .btn-pin { padding: 9px 18px; background: #5c6bc0; color: #fff; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+    .btn-pin:hover { background: #3f51b5; }
+
+    /* mensaje de error cuando el PIN es incorrecto */
+    .error-pin { font-size: 12px; color: #e53935; text-align: center; margin-top: 6px; min-height: 16px; }
+
+    /* panel de tabla y botones admin - oculto hasta que se ingrese el PIN correcto */
+    #seccion-admin { display: none; }
+
+    /* línea separadora entre secciones */
+    .divider { border: none; border-top: 1px solid #eee; margin: 20px 0; }
+
+    /* badge de empresa en el select */
+    .empresa-badge { font-size: 11px; color: #888; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+
+  <h1>📋 Formulario de asistencia CNF</h1>
+  <!-- subtítulo dinámico que muestra empresa y teléfono del empleado seleccionado -->
+  <p class="subtitulo" id="subtitulo-horario">Selecciona tu nombre para continuar</p>
+
+  <!-- ══════════════════════════════════════════
+       SECCIÓN: FORMULARIO DE REGISTRO
+       Se oculta tras registrarse exitosamente
+  ══════════════════════════════════════════ -->
+  <div id="seccion-formulario">
+    <div class="grid2">
+      <div style="grid-column: span 2">
+        <!-- selector principal: carga nombres desde BASE_EMPLEADOS automáticamente -->
+        <label for="empleado-sel">Selecciona tu nombre</label>
+        <select id="empleado-sel" onchange="alSeleccionarEmpleado()">
+          <option value="">— Busca tu nombre —</option>
+        </select>
+      </div>
+      <div>
+        <!-- campo de email: se rellena automáticamente desde la base de datos -->
+        <label for="email">Email <span style="color:#aaa;font-size:11px">(se llena automático)</span></label>
+        <input type="email" id="email" placeholder="Se llenará automáticamente">
+      </div>
+      <div>
+        <!-- campo de observación libre, aparece en el Excel como nota -->
+        <label for="extra">Observación (opcional)</label>
+        <input type="text" id="extra" placeholder="Ej: llegué con tráfico">
+      </div>
+    </div>
+    <!-- botón principal que ejecuta registrar() al hacer clic -->
+    <button class="btn btn-primary" id="btn-registrar" onclick="registrar()">✅ Registrar entrada</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SECCIÓN: MENSAJE DE CONFIRMACIÓN
+       Reemplaza al formulario tras el registro
+       Cambia color según si llegó tarde o no
+  ══════════════════════════════════════════ -->
+  <div class="msg-ok" id="msg-ok">
+    <div class="ico">✅</div>
+    <h2 id="msg-titulo">¡Registro exitoso!</h2>
+    <p id="msg-detalle">Tu asistencia fue registrada.</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SECCIÓN: PANEL ADMIN
+       Oculto por defecto, se muestra solo con PIN correcto
+       Contiene tabla de registros + botones de Excel y limpieza
+  ══════════════════════════════════════════ -->
+  <div id="seccion-admin">
+    <hr class="divider">
+    <!-- contador de registros en tiempo real -->
+    <p class="contador" id="contador">0 registros</p>
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Nombre completo</th>
+            <th>Empresa</th>
+            <th>Teléfono</th>
+            <th>Email</th>
+            <th>Hora entrada</th>
+            <th>Entrada esperada</th>
+            <th>Min. tarde</th>
+            <th>Descuento</th>
+            <th>Observación</th>
+          </tr>
+        </thead>
+        <tbody id="cuerpo-tabla">
+          <!-- filas generadas dinámicamente por actualizarTabla() -->
+          <tr><td colspan="10" class="empty">Sin registros aún.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- botón que genera el archivo .xlsx con SheetJS -->
+    <button class="btn btn-success" onclick="descargarExcel()">⬇ Descargar .xlsx</button>
+    <!-- botón que borra todos los registros de memoria -->
+    <button class="btn btn-danger"  onclick="limpiarTodo()">🗑 Limpiar todo</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SECCIÓN: ACCESO ADMIN CON PIN
+       Siempre visible al fondo
+       Se oculta automáticamente al ingresar PIN correcto
+  ══════════════════════════════════════════ -->
+  <div class="admin-section" id="admin-section">
+    <p class="admin-label">🔒 Acceso administrador</p>
+    <div class="admin-row">
+      <!-- input solo acepta números, Enter también activa verificarPin() -->
+      <input type="password" id="pin-input" placeholder="PIN" maxlength="10"
+             oninput="this.value=this.value.replace(/[^0-9]/g,'')"
+             onkeydown="if(event.key==='Enter') verificarPin()">
+      <button class="btn-pin" onclick="verificarPin()">Entrar</button>
+    </div>
+    <!-- mensaje de error si el PIN es incorrecto -->
+    <p class="error-pin" id="error-pin"></p>
+  </div>
+
+</div><!-- /card -->
+
+<script>
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║               ⚙️  SECCIÓN DE CONFIGURACIÓN                      ║
+// ║  Edita esta sección para cambiar horarios, días y descuentos    ║
+// ║  No es necesario modificar nada más abajo                       ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+  // ── cambiar PIN de acceso admin ──────────────────────────────────
+  const PIN_SECRETO = '1234';
+
+  // ── base de datos de empleados cargada desde Excel (informe de contactos) ──
+  // campos: nombre, apellido, empresa, telefono, email, horaEntrada, horaSalida, diasTrabajo
+  // diasTrabajo: 0=Domingo, 1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado
+  const BASE_EMPLEADOS = [
+    { nombre: 'Adrián',         apellido: 'Condell Cruz',        empresa: 'Tacomadre',    telefono: '5644993373', email: '',  horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] },
+    { nombre: 'Adriana',        apellido: 'Ramírez González',    empresa: 'Asimi',        telefono: '5560653412', email: '',  horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] },
+    { nombre: 'Alicia',         apellido: 'Diaz Dinorin',        empresa: 'Asimi',        telefono: '55 3250 7006', email: '', horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] },
+    { nombre: 'Andrea Yarith',  apellido: 'Castillo Ortiz',      empresa: 'Asimi',        telefono: '5578792276', email: '',  horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] },
+    { nombre: 'Armando',        apellido: 'Cortes',              empresa: 'Fumigarclean', telefono: '5659494320', email: '',  horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] },
+    { nombre: 'Bernardo',       apellido: 'Adillo Altamirano',   empresa: 'Fumigarclean', telefono: '55 5464 5591', email: '', horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] },
+    { nombre: 'Bruno',          apellido: 'Trejo Pérez',         empresa: 'CNF',          telefono: '56 2038 6605', email: '', horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] },
+    { nombre: 'Bruno v',        apellido: 'Ramírez González',    empresa: 'Cursos',       telefono: '5647082375', email: '',  horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] },
+    { nombre: 'Enrique',        apellido: 'González Placencia',  empresa: 'Asimi',        telefono: '55 7408 5475', email: '', horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] },
+    { nombre: 'Jaime Esteban',  apellido: 'Juarez Esparza',      empresa: 'Fumigarclean', telefono: '5663931686', email: '',  horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] },
+    { nombre: 'Javier Eduardo', apellido: 'Trejo Pérez',         empresa: 'Taqueria',     telefono: '5640790110', email: '',  horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] },
+    { nombre: 'Jeanett Mireya', apellido: 'Gonzales',            empresa: 'CNF',          telefono: '5580105722', email: '',  horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] },
+    { nombre: 'José Eduardo',   apellido: 'Cortés Hernández',    empresa: 'Rancho',       telefono: '56 1301 8199', email: '', horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] },
+    { nombre: 'Juan José',      apellido: 'Guardarrama Cruz',    empresa: 'CNF',          telefono: '56 3947 1693', email: '', horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] },,
+    { nombre: 'Lucia Ariadna',  apellido: 'Vázquez Gonzalez',    empresa: 'SNF',          telefono: '55 2866 7763', email: '', horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] },
+    { nombre: 'Luisa Fernanda', apellido: 'Campos Maldonado',    empresa: 'CNF',          telefono: '55 4069 8715', email: '', horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] },
+    { nombre: 'Paulino',        apellido: 'Arellano Benito',     empresa: 'Taqueria',     telefono: '55 3106 4805', email: '', horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] },
+    { nombre: 'Ricardo',        apellido: 'Galindo López',       empresa: 'Fumigarclean', telefono: '5535895929', email: '',  horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] },
+    { nombre: 'Silvia Martha',  apellido: 'Cabrera Martínez',    empresa: 'CNF',          telefono: '55 3788 8537', email: '', horaEntrada: '08:00', horaSalida: '17:00', diasTrabajo: [1,2,3,4,5] }
+  ];
+  // ── para cambiar el horario de un empleado específico, edita horaEntrada/horaSalida/diasTrabajo en su línea ──
+
+  // ── rangos de descuento por minutos de tardanza ──────────────────
+  // el último rango con maxMin: Infinity actúa como tope máximo
+  const RANGOS_DESCUENTO = [
+    { minMin: 1,  maxMin: 10,       descuento: 100 },
+    { minMin: 11, maxMin: 20,       descuento: 200 },
+    { minMin: 21, maxMin: Infinity, descuento: 200 } // tope máximo fijo
+  ];
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║                  FIN DE CONFIGURACIÓN                           ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+  // variables de estado globales
+  const filas = [];              // acumula todos los registros del día en memoria
+  let yaRegistrado = false;      // evita que el mismo usuario se registre dos veces
+  let adminDesbloqueado = false; // controla si el panel admin está visible
+
+  // ── poblar el select con los nombres de BASE_EMPLEADOS al cargar la página ──
+  // ordena alfabéticamente por nombre antes de insertar
+  function inicializar() {
+    const sel = document.getElementById('empleado-sel');
+    const ordenados = [...BASE_EMPLEADOS].sort((a, b) =>
+      a.nombre.localeCompare(b.nombre, 'es')
+    );
+    ordenados.forEach((e, i) => {
+      const opt = document.createElement('option');
+      // el value guarda el índice original en BASE_EMPLEADOS para recuperar todos sus datos
+      opt.value = BASE_EMPLEADOS.indexOf(e);
+      opt.textContent = `${e.nombre} ${e.apellido} — ${e.empresa}`;
+      sel.appendChild(opt);
+    });
+  }
+
+  // ── al seleccionar un empleado: muestra su info y rellena el email automáticamente ──
+  function alSeleccionarEmpleado() {
+    const idx = document.getElementById('empleado-sel').value;
+    const sub = document.getElementById('subtitulo-horario');
+    if (idx === '') {
+      sub.textContent = 'Selecciona tu nombre para continuar';
+      document.getElementById('email').value = '';
+      return;
+    }
+    const e = BASE_EMPLEADOS[idx];
+    const diasNombres = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+    const dias = e.diasTrabajo.map(d => diasNombres[d]).join(', ');
+    sub.textContent = `${e.empresa} · Tel: ${e.telefono} · Horario: ${e.horaEntrada}–${e.horaSalida} · Días: ${dias}`;
+    // rellenar email automáticamente si existe en la base de datos
+    document.getElementById('email').value = e.email || '';
+  }
+
+  // ── calcula el descuento en $ según los minutos de tardanza ──────
+  function calcularDescuento(minutosTarde) {
+    if (minutosTarde <= 0) return 0;
+    for (const r of RANGOS_DESCUENTO) {
+      if (minutosTarde >= r.minMin && minutosTarde <= r.maxMin) return r.descuento;
+    }
+    return 0;
+  }
+
+  // ── calcula cuántos minutos lleva de retraso el empleado ─────────
+  // positivo = tarde, negativo o cero = a tiempo
+  function calcMinutosTarde(horaEsperadaStr, horaRealDate) {
+    const [hh, mm] = horaEsperadaStr.split(':').map(Number);
+    const esperada = new Date(horaRealDate);
+    esperada.setHours(hh, mm, 0, 0);
+    return Math.floor((horaRealDate - esperada) / 60000);
+  }
+
+  // ── verifica si el día actual está en los días laborales del empleado ──
+  function esDiaLaboral(emp, fecha) {
+    return emp.diasTrabajo.includes(fecha.getDay());
+  }
+
+  // ── función principal: registra la entrada del empleado ──────────
+  // valida selección, calcula tardanza, guarda en filas[] y muestra confirmación
+  function registrar() {
+    if (yaRegistrado) return; // bloquea doble registro
+
+    const idx   = document.getElementById('empleado-sel').value;
+    const email = document.getElementById('email').value.trim();
+    const extra = document.getElementById('extra').value.trim();
+
+    if (idx === '') {
+      alert('Por favor selecciona tu nombre antes de registrarte.');
+      return;
+    }
+
+    const emp   = BASE_EMPLEADOS[idx];
+    const ahora = new Date();
+    const horaStr     = ahora.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const diasNombres = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+    const diaHoy      = diasNombres[ahora.getDay()];
+
+    // si hoy no es día laboral para este empleado, mostrar aviso y salir
+    if (!esDiaLaboral(emp, ahora)) {
+      document.getElementById('seccion-formulario').style.display = 'none';
+      const msgOk = document.getElementById('msg-ok');
+      msgOk.style.display = 'block';
+      msgOk.style.background = '#f3f3f3';
+      msgOk.style.borderColor = '#ccc';
+      document.getElementById('msg-titulo').style.color = '#555';
+      document.getElementById('msg-titulo').textContent = '📅 Hoy no laboras';
+      document.getElementById('msg-detalle').textContent =
+        `Hola ${emp.nombre}, hoy es ${diaHoy} y no está en tu horario de trabajo.`;
+      yaRegistrado = true;
+      return;
+    }
+
+    // calcular tardanza y descuento correspondiente
+    const mTarde    = calcMinutosTarde(emp.horaEntrada, ahora);
+    const descuento = calcularDescuento(mTarde);
+
+    // construir textos de estado para tabla y mensaje
+    let estadoEntrada, descuentoTexto;
+    if (mTarde <= 0) {
+      estadoEntrada  = 'A tiempo';
+      descuentoTexto = '$0';
+    } else if (mTarde <= 10) {
+      estadoEntrada  = `${mTarde} min tarde`;
+      descuentoTexto = '$100';
+    } else if (mTarde <= 20) {
+      estadoEntrada  = `${mTarde} min tarde`;
+      descuentoTexto = '$200';
+    } else {
+      estadoEntrada  = `${mTarde} min tarde (máx)`;
+      descuentoTexto = '$200';
+    }
+
+    // guardar registro en el array de filas (cada clave = columna en Excel)
+    filas.push({
+      'Nombre':            `${emp.nombre} ${emp.apellido}`,
+      'Empresa':           emp.empresa,
+      'Teléfono':          emp.telefono,
+      'Email':             email,
+      'Hora entrada':      horaStr,
+      'Entrada esperada':  emp.horaEntrada,
+      'Min. tarde':        mTarde > 0 ? mTarde : 0,
+      'Descuento':         descuentoTexto,
+      'Observación':       extra,
+      'Día':               diaHoy
+    });
+
+    // ocultar formulario y marcar como registrado
+    yaRegistrado = true;
+    document.getElementById('seccion-formulario').style.display = 'none';
+
+    // mostrar confirmación con color según puntualidad
+    const msgOk = document.getElementById('msg-ok');
+    msgOk.style.display = 'block';
+    if (mTarde <= 0) {
+      // llegó a tiempo: fondo verde
+      document.getElementById('msg-titulo').textContent = '✅ ¡Entrada registrada!';
+      document.getElementById('msg-detalle').textContent =
+        `Hola ${emp.nombre}, llegaste a tiempo (${horaStr}). ¡Buen día!`;
+    } else {
+      // llegó tarde: fondo naranja con monto de descuento
+      msgOk.style.background = '#fff3e0';
+      msgOk.style.borderColor = '#ffcc80';
+      document.getElementById('msg-titulo').style.color = '#e65100';
+      document.getElementById('msg-titulo').textContent = '⚠️ Registro con tardanza';
+      document.getElementById('msg-detalle').textContent =
+        `Hola ${emp.nombre}, llegaste a las ${horaStr} (${estadoEntrada}). Descuento: ${descuentoTexto}.`;
+    }
+
+    // si el admin ya está desbloqueado, refrescar la tabla inmediatamente
+    if (adminDesbloqueado) actualizarTabla();
+  }
+
+  // ── verifica el PIN y desbloquea el panel admin ──────────────────
+  // oculta la sección de PIN y muestra tabla + botones de descarga
+  function verificarPin() {
+    const pin   = document.getElementById('pin-input').value;
+    const errEl = document.getElementById('error-pin');
+    if (pin === PIN_SECRETO) {
+      adminDesbloqueado = true;
+      errEl.textContent = '';
+      document.getElementById('pin-input').value = '';
+      // ocultar sección PIN tras acceso exitoso
+      document.getElementById('admin-section').style.display = 'none';
+      // mostrar panel con tabla y botones
+      document.getElementById('seccion-admin').style.display = 'block';
+      actualizarTabla();
+    } else {
+      // PIN incorrecto: limpiar campo y mostrar error
+      errEl.textContent = 'PIN incorrecto. Intenta de nuevo.';
+      document.getElementById('pin-input').value = '';
+      document.getElementById('pin-input').focus();
+    }
+  }
+
+  // ── renderiza todas las filas de filas[] en la tabla HTML ────────
+  // aplica colores según si hay descuento o no
+  function actualizarTabla() {
+    const tbody = document.getElementById('cuerpo-tabla');
+    tbody.innerHTML = ''; // limpiar antes de redibujar
+
+    if (filas.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="10" class="empty">Sin registros aún.</td></tr>';
+      document.getElementById('contador').textContent = '0 registros';
+      return;
+    }
+
+    filas.forEach((f, i) => {
+      const tarde = parseInt(f['Min. tarde']) || 0;
+      const clase = tarde <= 0 ? 'tag-ok' : 'tag-desc'; // verde si puntual, naranja si tarde
+      const tr    = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td>${f['Nombre']}</td>
+        <td>${f['Empresa']}</td>
+        <td>${f['Teléfono']}</td>
+        <td>${f['Email'] || '—'}</td>
+        <td>${f['Hora entrada']}</td>
+        <td>${f['Entrada esperada']}</td>
+        <td class="${clase}">${tarde > 0 ? tarde + ' min' : '—'}</td>
+        <td class="${clase}">${f['Descuento']}</td>
+        <td>${f['Observación'] || '—'}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // actualizar contador sobre la tabla
+    document.getElementById('contador').textContent =
+      `${filas.length} registro${filas.length > 1 ? 's' : ''}`;
+  }
+
+  // ── genera y descarga el archivo .xlsx con SheetJS ───────────────
+  // convierte filas[] a hoja de Excel, ajusta anchos de columna y descarga
+  function descargarExcel() {
+    if (filas.length === 0) { alert('No hay registros para descargar.'); return; }
+    const ws = XLSX.utils.json_to_sheet(filas);
+    // ajuste automático del ancho de columnas según el nombre del encabezado
+    ws['!cols'] = Object.keys(filas[0]).map(k => ({ wch: Math.max(k.length, 14) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Asistencia');
+    XLSX.writeFile(wb, 'asistencia.xlsx');
+  }
+
+  // ── borra todos los registros de memoria y limpia la tabla ───────
+  function limpiarTodo() {
+    if (filas.length === 0) return;
+    if (confirm('¿Borrar todos los registros?')) {
+      filas.length = 0; // vaciar array sin romper referencias
+      actualizarTabla();
+    }
+  }
+
+  // ── permite registrar con la tecla Enter además del botón ────────
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !yaRegistrado) registrar();
+  });
+
+  // ── punto de entrada: cargar el select de empleados al abrir la página ──
+  inicializar();
+</script>
+</body>
+</html>
